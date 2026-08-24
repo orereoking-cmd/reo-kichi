@@ -54,12 +54,14 @@
   const dueDateInput = document.getElementById('dueDateInput');
   const recurRow = document.getElementById('recurRow');
   const recurDays = document.getElementById('recurDays');
+  const recurIntervalEl = document.getElementById('recurInterval');
   const hideCompletedToggle = document.getElementById('hideCompletedToggle');
 
   const HIDE_COMPLETED_KEY = 'reo-kichi-hide-completed';
 
   let selectedTag = DEFAULT_TAG;
-  let selectedRecurDay = null;
+  let selectedRecurDays = new Set();
+  let selectedRecurInterval = 1;
   let memos = loadMemos();
   let hideCompleted = localStorage.getItem(HIDE_COMPLETED_KEY) !== 'false';
   hideCompletedToggle.checked = hideCompleted;
@@ -82,25 +84,52 @@
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
-  // The most recent date (possibly today) that falls on the given weekday (0=Sun..6=Sat).
-  function mostRecentOccurrence(recurDay) {
+  function startOfWeek(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay()); // back to Sunday
+    return d;
+  }
+
+  // Whether the week containing `date` is an "active" week for the given interval,
+  // counting from the week containing `anchorDate`. interval=1 → every week.
+  function isWeekActive(date, anchorDate, interval) {
+    if (interval <= 1) return true;
+    const anchorWeek = startOfWeek(anchorDate);
+    const week = startOfWeek(date);
+    const weeksBetween = Math.round((week - anchorWeek) / (7 * 86400000));
+    return ((weeksBetween % interval) + interval) % interval === 0;
+  }
+
+  // The most recent date (possibly today) that is both one of memo.recurDays
+  // and falls in an active week per memo.recurInterval.
+  function mostRecentRoutineOccurrence(memo) {
+    const days = memo.recurDays;
+    if (!days || days.length === 0) return null;
+    const interval = memo.recurInterval || 1;
+    const anchor = new Date(memo.recurAnchor || memo.createdAt);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const diff = (today.getDay() - recurDay + 7) % 7;
-    today.setDate(today.getDate() - diff);
-    return today;
+    for (let i = 0; i < 21; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      if (days.includes(d.getDay()) && isWeekActive(d, anchor, interval)) {
+        return d;
+      }
+    }
+    return null;
   }
 
   function isRoutineDoneThisCycle(memo) {
-    if (memo.recurDay === null || memo.recurDay === undefined || !memo.lastCompletedAt) return false;
-    const cycleStart = mostRecentOccurrence(memo.recurDay);
+    const cycleStart = mostRecentRoutineOccurrence(memo);
+    if (!cycleStart || !memo.lastCompletedAt) return false;
     const completedDate = new Date(memo.lastCompletedAt);
     completedDate.setHours(0, 0, 0, 0);
     return completedDate >= cycleStart;
   }
 
   function isMemoComplete(memo) {
-    if (memo.tag === ROUTINE_TAG && memo.recurDay !== null && memo.recurDay !== undefined) {
+    if (memo.tag === ROUTINE_TAG && memo.recurDays && memo.recurDays.length > 0) {
       return isRoutineDoneThisCycle(memo);
     }
     return Boolean(memo.completed);
@@ -184,8 +213,10 @@
         ? `<input type="checkbox" class="memo-complete-checkbox" data-id="${memo.id}" ${completed ? 'checked' : ''} aria-label="完了">`
         : '';
       let dueBadgeHtml = '';
-      if (memo.tag === ROUTINE_TAG && memo.recurDay !== null && memo.recurDay !== undefined) {
-        dueBadgeHtml = `<span class="due-badge">🔁 毎週${WEEKDAY_LABELS[memo.recurDay]}</span>`;
+      if (memo.tag === ROUTINE_TAG && memo.recurDays && memo.recurDays.length > 0) {
+        const freq = memo.recurInterval === 2 ? '隔週' : '毎週';
+        const days = memo.recurDays.map((d) => WEEKDAY_LABELS[d]).join('・');
+        dueBadgeHtml = `<span class="due-badge">🔁 ${freq}${days}</span>`;
       } else if (isTaskTag(memo.tag) && memo.dueDate) {
         dueBadgeHtml = `<span class="due-badge${isOverdue(memo) ? ' is-overdue' : ''}">📅 ${formatDueDate(memo.dueDate)}</span>`;
       }
@@ -231,7 +262,9 @@
     };
 
     if (tag === ROUTINE_TAG) {
-      memo.recurDay = selectedRecurDay;
+      memo.recurDays = [...selectedRecurDays].sort();
+      memo.recurInterval = selectedRecurInterval;
+      memo.recurAnchor = todayISODate();
       memo.lastCompletedAt = null;
     } else if (isTaskTag(tag)) {
       memo.completed = false;
@@ -248,8 +281,10 @@
 
     memoInput.value = '';
     dueDateInput.value = '';
-    selectedRecurDay = null;
+    selectedRecurDays.clear();
+    selectedRecurInterval = 1;
     recurDays.querySelectorAll('.recur-day').forEach((c) => c.classList.remove('is-active'));
+    recurIntervalEl.querySelectorAll('.recur-interval-btn').forEach((c) => c.classList.toggle('is-active', c.dataset.interval === '1'));
     render();
     memoInput.focus();
   }
@@ -278,8 +313,20 @@
   recurDays.addEventListener('click', (e) => {
     const btn = e.target.closest('.recur-day');
     if (!btn) return;
-    selectedRecurDay = Number(btn.dataset.day);
-    recurDays.querySelectorAll('.recur-day').forEach((c) => c.classList.toggle('is-active', c === btn));
+    const day = Number(btn.dataset.day);
+    if (selectedRecurDays.has(day)) {
+      selectedRecurDays.delete(day);
+    } else {
+      selectedRecurDays.add(day);
+    }
+    btn.classList.toggle('is-active', selectedRecurDays.has(day));
+  });
+
+  recurIntervalEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.recur-interval-btn');
+    if (!btn) return;
+    selectedRecurInterval = Number(btn.dataset.interval);
+    recurIntervalEl.querySelectorAll('.recur-interval-btn').forEach((c) => c.classList.toggle('is-active', c === btn));
   });
 
   memoList.addEventListener('click', (e) => {
@@ -297,7 +344,7 @@
       const id = checkbox.dataset.id;
       const memo = memos.find((m) => m.id === id);
       if (memo) {
-        if (memo.tag === ROUTINE_TAG && memo.recurDay !== null && memo.recurDay !== undefined) {
+        if (memo.tag === ROUTINE_TAG && memo.recurDays && memo.recurDays.length > 0) {
           memo.lastCompletedAt = checkbox.checked ? todayISODate() : null;
         } else {
           memo.completed = checkbox.checked;
@@ -381,7 +428,9 @@
             createdAt: item.createdAt || new Date().toISOString(),
           };
           if (tag === ROUTINE_TAG) {
-            newMemo.recurDay = Number.isInteger(item.recurDay) ? item.recurDay : null;
+            newMemo.recurDays = Array.isArray(item.recurDays) ? item.recurDays.filter((d) => Number.isInteger(d)) : [];
+            newMemo.recurInterval = item.recurInterval === 2 ? 2 : 1;
+            newMemo.recurAnchor = typeof item.recurAnchor === 'string' ? item.recurAnchor : newMemo.createdAt;
             newMemo.lastCompletedAt = typeof item.lastCompletedAt === 'string' ? item.lastCompletedAt : null;
           } else if (isTaskTag(tag)) {
             newMemo.completed = Boolean(item.completed);

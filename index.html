@@ -91,7 +91,7 @@
       <li><span class="tag-chip tag-nekkyo_system">⚙️ 仕組化タスク</span> 仕組み・型作りのタネ</li>
       <li><span class="tag-chip tag-nekkyo_memo">💡 アイデア・メモ</span> ただの記録</li>
     </ul>
-    <p class="legend-hint">タスク系タグにはチェック・期限が付きます。ルーティンタスクは期限の代わりに曜日を指定でき、完了チェックはその週の分だけ有効で翌週の該当曜日に自動で未完了へ戻ります。本文に #ルーティン #思考 #仕組化 と書くと自動でタグ付けされます。</p>
+    <p class="legend-hint">タスク系タグにはチェック・期限が付きます。ルーティンタスクは期限の代わりに曜日（複数選択可）と毎週/隔週の頻度を指定でき、完了チェックはその周期の分だけ有効で次の該当日に自動で未完了へ戻ります。本文に #ルーティン #思考 #仕組化 と書くと自動でタグ付けされます。</p>
   </section>
 </aside>
 
@@ -121,15 +121,24 @@
       <input type="date" id="dueDateInput">
     </div>
     <div class="recur-row is-hidden" id="recurRow">
-      <label>毎週</label>
-      <div class="recur-days" id="recurDays">
-        <button class="recur-day" data-day="1">月</button>
-        <button class="recur-day" data-day="2">火</button>
-        <button class="recur-day" data-day="3">水</button>
-        <button class="recur-day" data-day="4">木</button>
-        <button class="recur-day" data-day="5">金</button>
-        <button class="recur-day" data-day="6">土</button>
-        <button class="recur-day" data-day="0">日</button>
+      <div class="recur-line">
+        <label>曜日</label>
+        <div class="recur-days" id="recurDays">
+          <button class="recur-day" data-day="1">月</button>
+          <button class="recur-day" data-day="2">火</button>
+          <button class="recur-day" data-day="3">水</button>
+          <button class="recur-day" data-day="4">木</button>
+          <button class="recur-day" data-day="5">金</button>
+          <button class="recur-day" data-day="6">土</button>
+          <button class="recur-day" data-day="0">日</button>
+        </div>
+      </div>
+      <div class="recur-line">
+        <label>頻度</label>
+        <div class="recur-interval" id="recurInterval">
+          <button class="recur-interval-btn is-active" data-interval="1">毎週</button>
+          <button class="recur-interval-btn" data-interval="2">隔週</button>
+        </div>
       </div>
     </div>
     <div class="composer-footer">

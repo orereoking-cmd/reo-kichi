@@ -487,8 +487,8 @@ button.tag-chip:not(.is-active):hover {
 
 .recur-row {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  flex-direction: column;
+  gap: 0.5rem;
   margin-top: 0.6rem;
 }
 
@@ -496,10 +496,19 @@ button.tag-chip:not(.is-active):hover {
   display: none;
 }
 
-.recur-row label {
+.recur-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.recur-line label {
   font-size: 0.7rem;
   color: var(--text-faint);
   font-family: var(--font-mono);
+  flex-shrink: 0;
+  width: 2.4rem;
 }
 
 .recur-days {
@@ -525,6 +534,33 @@ button.tag-chip:not(.is-active):hover {
 }
 
 .recur-day.is-active {
+  background: var(--nekkyo-routine-bg);
+  border-color: var(--nekkyo-routine);
+  color: var(--nekkyo-routine);
+}
+
+.recur-interval {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.recur-interval-btn {
+  padding: 0.3rem 0.6rem;
+  border-radius: 20px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg);
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.recur-interval-btn:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.recur-interval-btn.is-active {
   background: var(--nekkyo-routine-bg);
   border-color: var(--nekkyo-routine);
   color: var(--nekkyo-routine);
