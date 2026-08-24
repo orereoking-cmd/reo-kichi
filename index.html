@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>レオ基地</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%230a0e16%22/><text x=%2250%22 y=%2268%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22%23d4af37%22>基</text></svg>">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#0a0e16">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="レオ基地">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-mark">REO</div>
+      <div class="brand-text">
+        <h1>レオ基地</h1>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="status-badge" id="statusBadge" title="このデータはこのブラウザ内にのみ保存されています">
+        <span class="status-dot"></span>
+        <span class="status-label">ローカル保存中</span>
+      </span>
+      <button class="hamburger" id="menuToggle" aria-label="メニュー" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="menu-overlay" id="menuOverlay"></div>
+<aside class="menu-panel" id="menuPanel" aria-hidden="true">
+  <div class="menu-panel-header">
+    <span>設定</span>
+    <button class="menu-close" id="menuClose" aria-label="閉じる">×</button>
+  </div>
+
+  <section class="menu-section">
+    <h2>外部連携</h2>
+    <div class="menu-item menu-item-disabled">
+      <div class="menu-item-main">
+        <span class="menu-item-title">Googleスプレッドシート連携</span>
+        <span class="menu-item-badge">準備中</span>
+      </div>
+      <p class="menu-item-desc">メモをスプレッドシートへ自動転記。次フェーズで実装予定です。</p>
+    </div>
+  </section>
+
+  <section class="menu-section">
+    <h2>データ管理</h2>
+    <div class="menu-item">
+      <button class="menu-btn" id="exportBtn">JSONをエクスポート</button>
+      <p class="menu-item-desc">全メモをファイルに書き出し、バックアップします。</p>
+    </div>
+    <div class="menu-item">
+      <button class="menu-btn" id="importBtn">JSONをインポート</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
+      <p class="menu-item-desc">書き出したファイルを読み込み、既存のメモに統合します。</p>
+    </div>
+    <div class="menu-item">
+      <button class="menu-btn menu-btn-danger" id="clearBtn">全データを削除</button>
+      <p class="menu-item-desc">この基地に保存された全メモを消去します。元に戻せません。</p>
+    </div>
+  </section>
+
+  <section class="menu-section">
+    <h2>凡例</h2>
+    <p class="legend-group-label">個人</p>
+    <ul class="legend">
+      <li><span class="tag-chip tag-personal_task">✅ 通常タスク</span> チェック・期限つき</li>
+      <li><span class="tag-chip tag-personal_memo">💡 アイデア・メモ</span> ただの記録</li>
+    </ul>
+    <p class="legend-group-label">Nekkyo合同会社</p>
+    <ul class="legend">
+      <li><span class="tag-chip tag-nekkyo_routine">🔁 ルーティンタスク</span> 定例で発生する対応</li>
+      <li><span class="tag-chip tag-nekkyo_task">✅ 通常タスク</span> 単発の対応事項</li>
+      <li><span class="tag-chip tag-nekkyo_think">🧠 思考タスク</span> 考えて答えを出すべきこと</li>
+      <li><span class="tag-chip tag-nekkyo_system">⚙️ 仕組化タスク</span> 仕組み・型作りのタネ</li>
+      <li><span class="tag-chip tag-nekkyo_memo">💡 アイデア・メモ</span> ただの記録</li>
+    </ul>
+    <p class="legend-hint">タスク系タグにはチェック・期限が付きます。本文に #ルーティン #思考 #仕組化 と書くと自動でタグ付けされます。</p>
+  </section>
+</aside>
+
+<main class="main">
+  <div class="view-tabs" id="viewTabs">
+    <button class="view-tab" data-group="personal">個人</button>
+    <button class="view-tab" data-group="nekkyo">Nekkyo合同会社</button>
+  </div>
+
+  <div class="composer">
+    <div class="tag-selector" id="tagSelector">
+      <div class="tag-group" data-group="personal">
+        <button class="tag-chip tag-personal_task" data-tag="personal_task">✅ 通常タスク</button>
+        <button class="tag-chip tag-personal_memo" data-tag="personal_memo">💡 アイデア・メモ</button>
+      </div>
+      <div class="tag-group" data-group="nekkyo">
+        <button class="tag-chip tag-nekkyo_routine" data-tag="nekkyo_routine">🔁 ルーティンタスク</button>
+        <button class="tag-chip tag-nekkyo_task" data-tag="nekkyo_task">✅ 通常タスク</button>
+        <button class="tag-chip tag-nekkyo_think" data-tag="nekkyo_think">🧠 思考タスク</button>
+        <button class="tag-chip tag-nekkyo_system" data-tag="nekkyo_system">⚙️ 仕組化タスク</button>
+        <button class="tag-chip tag-nekkyo_memo" data-tag="nekkyo_memo">💡 アイデア・メモ</button>
+      </div>
+    </div>
+    <textarea id="memoInput" placeholder="メモを入力" rows="3"></textarea>
+    <div class="due-date-row is-hidden" id="dueDateRow">
+      <label for="dueDateInput">期限（任意）</label>
+      <input type="date" id="dueDateInput">
+    </div>
+    <div class="composer-footer">
+      <span class="composer-hint"><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>Enter</kbd> で追加</span>
+      <button class="deploy-btn" id="addBtn">追加</button>
+    </div>
+  </div>
+
+  <div class="log-header">
+    <span class="log-title">ログ</span>
+    <div class="log-header-right">
+      <label class="hide-completed-toggle">
+        <input type="checkbox" id="hideCompletedToggle" checked>
+        完了済みタスクを隠す
+      </label>
+      <span class="log-count" id="logCount">0件</span>
+    </div>
+  </div>
+
+  <ul class="memo-list" id="memoList"></ul>
+
+  <div class="empty-state" id="emptyState">
+    <p>まだメモがありません</p>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
