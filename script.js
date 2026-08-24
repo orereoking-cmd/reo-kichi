@@ -28,6 +28,8 @@
   const DEFAULT_TAG_BY_GROUP = { personal: 'personal_memo', nekkyo: 'nekkyo_memo' };
   const GROUP_LABEL = { personal: '個人', nekkyo: 'Nekkyo' };
   const VIEW_KEY = 'reo-kichi-view';
+  const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+  const ROUTINE_TAG = 'nekkyo_routine';
 
   const memoInput = document.getElementById('memoInput');
   const addBtn = document.getElementById('addBtn');
@@ -50,11 +52,14 @@
 
   const dueDateRow = document.getElementById('dueDateRow');
   const dueDateInput = document.getElementById('dueDateInput');
+  const recurRow = document.getElementById('recurRow');
+  const recurDays = document.getElementById('recurDays');
   const hideCompletedToggle = document.getElementById('hideCompletedToggle');
 
   const HIDE_COMPLETED_KEY = 'reo-kichi-hide-completed';
 
   let selectedTag = DEFAULT_TAG;
+  let selectedRecurDay = null;
   let memos = loadMemos();
   let hideCompleted = localStorage.getItem(HIDE_COMPLETED_KEY) !== 'false';
   hideCompletedToggle.checked = hideCompleted;
@@ -67,7 +72,38 @@
   function selectTag(tagKey) {
     selectedTag = tagKey;
     tagSelector.querySelectorAll('.tag-chip').forEach((c) => c.classList.toggle('is-active', c.dataset.tag === tagKey));
-    dueDateRow.classList.toggle('is-hidden', !isTaskTag(selectedTag));
+    dueDateRow.classList.toggle('is-hidden', !isTaskTag(selectedTag) || selectedTag === ROUTINE_TAG);
+    recurRow.classList.toggle('is-hidden', selectedTag !== ROUTINE_TAG);
+  }
+
+  function todayISODate() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  // The most recent date (possibly today) that falls on the given weekday (0=Sun..6=Sat).
+  function mostRecentOccurrence(recurDay) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = (today.getDay() - recurDay + 7) % 7;
+    today.setDate(today.getDate() - diff);
+    return today;
+  }
+
+  function isRoutineDoneThisCycle(memo) {
+    if (memo.recurDay === null || memo.recurDay === undefined || !memo.lastCompletedAt) return false;
+    const cycleStart = mostRecentOccurrence(memo.recurDay);
+    const completedDate = new Date(memo.lastCompletedAt);
+    completedDate.setHours(0, 0, 0, 0);
+    return completedDate >= cycleStart;
+  }
+
+  function isMemoComplete(memo) {
+    if (memo.tag === ROUTINE_TAG && memo.recurDay !== null && memo.recurDay !== undefined) {
+      return isRoutineDoneThisCycle(memo);
+    }
+    return Boolean(memo.completed);
   }
 
   function setView(group) {
@@ -125,7 +161,7 @@
   }
 
   function isOverdue(memo) {
-    if (!memo.dueDate || memo.completed) return false;
+    if (memo.tag === ROUTINE_TAG || !memo.dueDate || memo.completed) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return new Date(memo.dueDate) < today;
@@ -134,22 +170,25 @@
   function render() {
     memoList.innerHTML = '';
     const inView = memos.filter((m) => (TAGS[m.tag] || TAGS[DEFAULT_TAG]).group === currentView);
-    const visible = inView.filter((m) => !(hideCompleted && isTaskTag(m.tag) && m.completed));
+    const visible = inView.filter((m) => !(hideCompleted && isTaskTag(m.tag) && isMemoComplete(m)));
     const sorted = [...visible].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
     for (const memo of sorted) {
       const tagInfo = TAGS[memo.tag] || TAGS[DEFAULT_TAG];
       const li = document.createElement('li');
-      const completed = isTaskTag(memo.tag) && memo.completed;
+      const completed = isTaskTag(memo.tag) && isMemoComplete(memo);
       li.className = `memo-card card-${memo.tag}${completed ? ' is-completed' : ''}`;
       li.dataset.id = memo.id;
 
       const checkboxHtml = isTaskTag(memo.tag)
-        ? `<input type="checkbox" class="memo-complete-checkbox" data-id="${memo.id}" ${memo.completed ? 'checked' : ''} aria-label="完了">`
+        ? `<input type="checkbox" class="memo-complete-checkbox" data-id="${memo.id}" ${completed ? 'checked' : ''} aria-label="完了">`
         : '';
-      const dueBadgeHtml = isTaskTag(memo.tag) && memo.dueDate
-        ? `<span class="due-badge${isOverdue(memo) ? ' is-overdue' : ''}">📅 ${formatDueDate(memo.dueDate)}</span>`
-        : '';
+      let dueBadgeHtml = '';
+      if (memo.tag === ROUTINE_TAG && memo.recurDay !== null && memo.recurDay !== undefined) {
+        dueBadgeHtml = `<span class="due-badge">🔁 毎週${WEEKDAY_LABELS[memo.recurDay]}</span>`;
+      } else if (isTaskTag(memo.tag) && memo.dueDate) {
+        dueBadgeHtml = `<span class="due-badge${isOverdue(memo) ? ' is-overdue' : ''}">📅 ${formatDueDate(memo.dueDate)}</span>`;
+      }
 
       li.innerHTML = `
         <div class="memo-card-head">
@@ -191,7 +230,10 @@
       createdAt: new Date().toISOString(),
     };
 
-    if (isTaskTag(tag)) {
+    if (tag === ROUTINE_TAG) {
+      memo.recurDay = selectedRecurDay;
+      memo.lastCompletedAt = null;
+    } else if (isTaskTag(tag)) {
       memo.completed = false;
       memo.dueDate = dueDateInput.value || null;
     }
@@ -206,6 +248,8 @@
 
     memoInput.value = '';
     dueDateInput.value = '';
+    selectedRecurDay = null;
+    recurDays.querySelectorAll('.recur-day').forEach((c) => c.classList.remove('is-active'));
     render();
     memoInput.focus();
   }
@@ -231,6 +275,13 @@
     setView(btn.dataset.group);
   });
 
+  recurDays.addEventListener('click', (e) => {
+    const btn = e.target.closest('.recur-day');
+    if (!btn) return;
+    selectedRecurDay = Number(btn.dataset.day);
+    recurDays.querySelectorAll('.recur-day').forEach((c) => c.classList.toggle('is-active', c === btn));
+  });
+
   memoList.addEventListener('click', (e) => {
     const deleteBtn = e.target.closest('.memo-delete');
     if (deleteBtn) {
@@ -246,7 +297,11 @@
       const id = checkbox.dataset.id;
       const memo = memos.find((m) => m.id === id);
       if (memo) {
-        memo.completed = checkbox.checked;
+        if (memo.tag === ROUTINE_TAG && memo.recurDay !== null && memo.recurDay !== undefined) {
+          memo.lastCompletedAt = checkbox.checked ? todayISODate() : null;
+        } else {
+          memo.completed = checkbox.checked;
+        }
         saveMemos();
         render();
       }
@@ -325,7 +380,10 @@
             tag,
             createdAt: item.createdAt || new Date().toISOString(),
           };
-          if (isTaskTag(tag)) {
+          if (tag === ROUTINE_TAG) {
+            newMemo.recurDay = Number.isInteger(item.recurDay) ? item.recurDay : null;
+            newMemo.lastCompletedAt = typeof item.lastCompletedAt === 'string' ? item.lastCompletedAt : null;
+          } else if (isTaskTag(tag)) {
             newMemo.completed = Boolean(item.completed);
             newMemo.dueDate = typeof item.dueDate === 'string' ? item.dueDate : null;
           }
